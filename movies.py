@@ -43,7 +43,7 @@ dict_cols_list = [
         "Keywords"
 ]
 
-for column in dict_cols_list:
+for column in dict_cols_list: # converts json columns into python dictionaries
     train[column] = train[column].apply(lambda x: {} if pd.isna(x) else ast.literal_eval(x))
     test[column] = test[column].apply(lambda x: {} if pd.isna(x) else ast.literal_eval(x))
 
