@@ -1,13 +1,12 @@
 
+import shap
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns 
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold
 import xgboost as xgb
-from sklearn.linear_model import RidgeCV
-from sklearn.ensemble import RandomForestRegressor
+import matplotlib.pyplot as plt
+from catboost import CatBoostRegressor
+from sklearn.model_selection import train_test_split
 
 ##################
 ## Loading data ##
@@ -33,7 +32,6 @@ train["release_quarter"] = release_date.dt.quarter # extract quarter
 
 train = pd.merge(train, train_extra_feats, how = "left", on = "imdb_id") # now ready to join extra features
 
-json_cols = ["genres", "production_companies", "production_countries", "spoken_languages", "cast", "crew", "Keywords"]
 
 #def text_to_dict(df):
 #    for column in json_cols:
@@ -43,6 +41,17 @@ json_cols = ["genres", "production_companies", "production_countries", "spoken_l
 #train = text_to_dict(train)
 #test = text_to_dict(test)
 
+dict_cols_list = [
+        "genres",
+        "production_companies",
+        "production_countries",
+        "spoken_languages",
+        "cast",
+        "crew",
+        "Keywords"
+]
+
+
 def get_dict(s):
     try:
         d = eval(s)
@@ -50,8 +59,8 @@ def get_dict(s):
         d = {}
     return d
 
-for col in json_cols:
-    train[col] = train[col].apply(lambda x : get_dict(x))
+for col in dict_cols_list:
+    train[col] = train[col].apply(lambda x : get_dict(x)) # string columns to dictionaries
     test[col] = test[col].apply(lambda x : get_dict(x))
 
 train["has_homepage"] = 0
@@ -66,7 +75,7 @@ train.loc[train["belongs_to_collection"].isnull() == False, "has_collection"] = 
 train["has_tagline"] = 0
 train.loc[train["tagline"].isnull() == False, "has_tagline"] = 1 # dummify homepage property
 
-train["num_countries"] = train["production_countries"].apply(lambda x: len(x) if x != {} else 0) # some  crude features
+train["num_countries"] = train["production_countries"].apply(lambda x: len(x) if x != {} else 0) # some crude features
 train["num_genres"] = train["genres"].apply(lambda x: len(x) if x != {} else 0)
 train["num_cast"] = train["cast"].apply(lambda x: len(x) if x != {} else 0)
 train["num_crew"] = test["crew"].apply(lambda x: len(x) if x != {} else 0)
@@ -76,12 +85,10 @@ train["num_languages"] = train["spoken_languages"].apply(lambda x: len(x) if x !
 
 sns.distplot(train["revenue"])
 train["revenue"] = np.log1p(train["revenue"]) # fix skewness
-sns.distplot(train["revenue"])
 
 train["budget"] = train["budget"] + train["budget"] * 0.018 * (2018 - train["release_year"]) # adjusting for inflation
 sns.distplot(train["budget"])
 train["budget"] = np.log1p(train["budget"]) # fix skewness
-sns.distplot(train["budget"])
 
 train["status"].value_counts()
 not_released = train[train["status"] != "Released"].index
@@ -90,15 +97,15 @@ train = train.drop(not_released) # remove movies not released yet
 train = train[[ # select features to be used
         "budget",
         "popularity",
+        "popularity2",
         "runtime",
+        "rating",
+        "totalVotes",
         "release_month",
         "release_day",
         "release_dayofweek",
         "release_year",
         "release_quarter",
-        "popularity2",
-        "rating",
-        "totalVotes",
         "has_homepage",
         "has_collection",
         "has_tagline",
@@ -114,8 +121,6 @@ train = train[[ # select features to be used
         ]
 ]
     
-train.info()
-train.describe()
 train.isna().sum()    
     
 train = train.dropna(axis = 0) # drop rows with missing values
@@ -123,7 +128,7 @@ train = train.dropna(axis = 0) # drop rows with missing values
 x = train.drop(["revenue"], axis = 1)
 y = train["revenue"]
 
-x_train, x_val, y_train, y_val = train_test_split(x, y, test_size = 0.1)
+x_train, x_val, y_train, y_val = train_test_split(x, y, test_size = 0.2)
 
 ######################
 ## Visualizing data ##
@@ -166,7 +171,7 @@ sns.heatmap(train.corr())
 # Prepare test data #
 #####################
 
-test["release_date"][828]  = "1/1/00" # fill na in row 828
+test["release_date"] = test["release_date"].fillna("1/1/00") # fill na in row 828
 test[["release_month", "release_day", "release_year"]] = test["release_date"].str.split("/", expand = True).astype(int)
 test.loc[test["release_year"] <= 19, "release_year"] += 2000
 test.loc[test["release_year"] < 2000, "release_year"] += 1900
@@ -203,15 +208,15 @@ test["budget"] = np.log1p(test["budget"])
 test = test[[
         "budget",
         "popularity",
+        "popularity2",
         "runtime",
+        "rating",
+        "totalVotes",
         "release_month",
         "release_day",
         "release_dayofweek",
         "release_year",
         "release_quarter",
-        "popularity2",
-        "rating",
-        "totalVotes",
         "has_homepage",
         "has_collection",
         "has_tagline",
@@ -226,15 +231,13 @@ test = test[[
         ]
 ]
 
-test.info()
-test.describe()
 test.isna().sum()    
     
-test["runtime"] = test["runtime"].fillna(test["runtime"].mean()) # must impute missing values bc length must remain constant
+test["runtime"] = test["runtime"].fillna(test["runtime"].mean()) # must impute NA
 test["popularity2"] = test["popularity2"].fillna(test["popularity2"].mean())
 test["rating"] = test["rating"].fillna(test["rating"].mean())
-test["totalVotes"] = test["totalVotes"].fillna(test["totalVotes"].mean())    
-    
+test["totalVotes"] = test["totalVotes"].fillna(test["totalVotes"].mean())  
+
 x_test = test
 
 ####################
@@ -248,11 +251,11 @@ test_xgb = xgb.DMatrix(x_test)
 
 params = {
         "objective": "reg:linear",
-        "max_depth": 6,
+        "eval_metric": "rmse",
+        "max_depth": 5,
         "eta": 0.01,
         "subsample": 0.6,
         "colsample_bytree": 0.7,
-        "eval_metric": "rmse",
         "silent": False
 }
 
@@ -261,47 +264,56 @@ model_xgb = xgb.train(
         train_xgb,
         num_boost_round = 100000,
         evals = [(train_xgb, "train"), (val_xgb, "valid")],
-        early_stopping_rounds = 1000,
+        early_stopping_rounds = 500,
 )
 
 preds_xgb = model_xgb.predict(test_xgb, ntree_limit = model_xgb.best_ntree_limit)
                               
 xgb.plot_importance(model_xgb)
 
-xgb.to_graphviz(model_xgb, num_trees=model_xgb.best_ntree_limit)
+xgb.to_graphviz(model_xgb, num_trees = model_xgb.best_ntree_limit)
 
-# 2. Ridge regression
-folds = KFold(n_splits = 10, shuffle = True)
+shap_explainer = shap.TreeExplainer(model_xgb) # explainability with SHAP
+shap_values = shap_explainer.shap_values(x_train)
 
-model_rr = RidgeCV(
-        alphas = (0.01, 0.1, 1.0, 10.0, 100.0),
-        scoring = "neg_mean_squared_error",
-        cv = folds
+shap.force_plot(  # SHAP values for first prediction
+        shap_explainer.expected_value,
+        shap_values[0,:],
+        x_train.iloc[0,:],
+        matplotlib = True
 )
 
-model_rr.fit(x_train, y_train)
+shap.summary_plot(shap_values, x_train) # feature importance summary
 
-preds_rr = model_rr.predict(x_test)
-
-# 3. Random forest
-model_rf = RandomForestRegressor(
-        criterion = "mse",
-        max_depth = 7,
-        max_features = "sqrt",
-        n_estimators = 10000,
-        n_jobs = -2,
-        verbose = 1
+# 2. Catboost
+model_cat = CatBoostRegressor(
+        iterations = 100000,
+        learning_rate = 0.004,
+        depth = 5,
+        eval_metric = "RMSE",
+        colsample_bylevel = 0.8,
+        bagging_temperature = 0.2,
+        metric_period = None,
+        early_stopping_rounds = 200
 )
 
-model_rf.fit(x_train, y_train)
+model_cat.fit(
+        x_train,
+        y_train,
+        eval_set = (x_val, y_val),
+        use_best_model = True,
+        verbose = True
+)
 
-graph = sns.barplot(x = list(x_train.columns), y = model_rf.feature_importances_)
-graph.set_xticklabels(graph.get_xticklabels(), rotation = 90)
+preds_cat = model_cat.predict(x_test)
 
-preds_rf = model_rf.predict(x_test)
+shap_explainer = shap.TreeExplainer(model_cat)
+shap_values = shap_explainer.shap_values(x_train)
+
+shap.summary_plot(shap_values, x_train)
 
 # Model averaging
-preds = (0.6 * preds_xgb) + (0.2 * preds_rf) + (0.2 * preds_rr)
+preds = (0.6 * preds_xgb) + (0.4 * preds_cat)
 
 ################
 ## Submission ##
