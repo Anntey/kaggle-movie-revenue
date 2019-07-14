@@ -1,4 +1,5 @@
 
+import ast
 import shap
 import numpy as np
 import pandas as pd
@@ -32,15 +33,6 @@ train["release_quarter"] = release_date.dt.quarter # extract quarter
 
 train = pd.merge(train, train_extra_feats, how = "left", on = "imdb_id") # now ready to join extra features
 
-
-#def text_to_dict(df):
-#    for column in json_cols:
-#        df[column] = df[column].apply(lambda x: {} if pd.isna(x) else ast.literal_eval(x) )
-#    return df
-#
-#train = text_to_dict(train)
-#test = text_to_dict(test)
-
 dict_cols_list = [
         "genres",
         "production_companies",
@@ -51,17 +43,9 @@ dict_cols_list = [
         "Keywords"
 ]
 
-
-def get_dict(s):
-    try:
-        d = eval(s)
-    except:
-        d = {}
-    return d
-
-for col in dict_cols_list:
-    train[col] = train[col].apply(lambda x : get_dict(x)) # string columns to dictionaries
-    test[col] = test[col].apply(lambda x : get_dict(x))
+for column in dict_cols_list:
+    train[column] = train[column].apply(lambda x: {} if pd.isna(x) else ast.literal_eval(x))
+    test[column] = test[column].apply(lambda x: {} if pd.isna(x) else ast.literal_eval(x))
 
 train["has_homepage"] = 0
 train.loc[train["homepage"].isnull() == False, "has_homepage"] = 1 # dummify homepage property
