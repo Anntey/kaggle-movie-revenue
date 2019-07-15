@@ -189,6 +189,8 @@ test["num_keywords"] = test["Keywords"].apply(lambda x: len(x) if x != {} else 0
 test["budget"] = test["budget"] + test["budget"] * 0.018 * (2018 - test["release_year"])
 test["budget"] = np.log1p(test["budget"]) 
 
+test["revenue"] = np.log1p(test["revenue"]) # fix skewness
+
 test = test[[
         "budget",
         "popularity",
@@ -262,8 +264,8 @@ shap_values = shap_explainer.shap_values(x_train)
 
 shap.force_plot(  # SHAP values for first prediction
         shap_explainer.expected_value,
-        shap_values[0,:],
-        x_train.iloc[0,:],
+        shap_values[0, :],
+        x_train.iloc[0, :],
         matplotlib = True
 )
 
