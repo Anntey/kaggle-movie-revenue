@@ -189,8 +189,6 @@ test["num_keywords"] = test["Keywords"].apply(lambda x: len(x) if x != {} else 0
 test["budget"] = test["budget"] + test["budget"] * 0.018 * (2018 - test["release_year"])
 test["budget"] = np.log1p(test["budget"]) 
 
-test["revenue"] = np.log1p(test["revenue"]) # fix skewness
-
 test = test[[
         "budget",
         "popularity",
