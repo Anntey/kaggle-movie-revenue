@@ -6,6 +6,6 @@ Task: predict movie's overall box office revenue
 
 Evaluation: Root-Mean-Squared-Logarithmic-Error (RMSLE)
 
-Solution: model averaging over (1) XGB and (2) CAT
+Solution: model averaging over (1) XGBoost and (2) CatBoostRegressor
 
 Success: 2.03 RMSLE
