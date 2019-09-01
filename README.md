@@ -9,3 +9,5 @@ Evaluation: Root-Mean-Squared-Logarithmic-Error (RMSLE)
 Solution: model averaging over (1) XGBoost and (2) CatBoostRegressor
 
 Success: 2.03 RMSLE
+
+![](shap_summary.png)
