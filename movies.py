@@ -1,3 +1,6 @@
+#############
+# Libraries #
+#############
 
 import ast
 import shap
@@ -9,9 +12,9 @@ import matplotlib.pyplot as plt
 from catboost import CatBoostRegressor
 from sklearn.model_selection import train_test_split
 
-##################
-## Loading data ##
-##################
+################
+# Loading data #
+################
 
 train = pd.read_csv("./input/train.csv")
 test = pd.read_csv("./input/test.csv")
@@ -19,9 +22,9 @@ test = pd.read_csv("./input/test.csv")
 train_extra_feats = pd.read_csv("./input/TrainAdditionalFeatures.csv") # additional features
 test_extra_feats = pd.read_csv("./input/TestAdditionalFeatures.csv")
 
-#########################
-## Feature engineering ##
-#########################
+#######################
+# Feature engineering #
+#######################
 
 train[["release_month", "release_day", "release_year"]] = train["release_date"].str.split("/", expand = True).astype(int) # split date
 train.loc[train["release_year"] <= 19, "release_year"] += 2000 # released 2000-2019
@@ -114,9 +117,9 @@ y = train["revenue"]
 
 x_train, x_val, y_train, y_val = train_test_split(x, y, test_size = 0.2)
 
-######################
-## Visualizing data ##
-######################
+####################
+# Visualizing data #
+####################
 
 sns.scatterplot(x = "budget", y = "revenue", data = train, alpha = 0.4) 
 sns.scatterplot(x = "popularity", y = "revenue", data = train, alpha = 0.4)
@@ -224,11 +227,11 @@ test["totalVotes"] = test["totalVotes"].fillna(test["totalVotes"].mean())
 
 x_test = test
 
-####################
-## Fitting models ##
-####################
+##################
+# Fitting models #
+##################
 
-# 1. XGBoost
+# ----------- 1. XGBoost ---------------
 train_xgb = xgb.DMatrix(x_train, y_train)
 val_xgb = xgb.DMatrix(x_val, y_val)
 test_xgb = xgb.DMatrix(x_test)
@@ -269,7 +272,7 @@ shap.force_plot(  # SHAP values for first prediction
 
 shap.summary_plot(shap_values, x_train) # feature importance summary
 
-# 2. Catboost
+# ----------- 2. Catboost ---------------
 model_cat = CatBoostRegressor(
         iterations = 100000,
         learning_rate = 0.004,
@@ -296,7 +299,7 @@ shap_values = shap_explainer.shap_values(x_train)
 
 shap.summary_plot(shap_values, x_train)
 
-# Model averaging
+# ----------- Model averaging ---------------
 preds = (0.6 * preds_xgb) + (0.4 * preds_cat)
 
 ################
