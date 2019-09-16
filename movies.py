@@ -1,3 +1,4 @@
+
 #############
 # Libraries #
 #############
@@ -232,7 +233,6 @@ x_test = test
 ##################
 
 # ----------- 1. XGBoost -----------
-
 train_xgb = xgb.DMatrix(x_train, y_train)
 val_xgb = xgb.DMatrix(x_val, y_val)
 test_xgb = xgb.DMatrix(x_test)
@@ -273,8 +273,7 @@ shap.force_plot(  # SHAP values for first prediction
 
 shap.summary_plot(shap_values, x_train) # feature importance summary
 
-# ----------- 2. Catboost -----------
-
+# ----------- 2. CatBoost -----------
 model_cat = CatBoostRegressor(
         iterations = 100000,
         learning_rate = 0.004,
@@ -301,8 +300,7 @@ shap_values = shap_explainer.shap_values(x_train)
 
 shap.summary_plot(shap_values, x_train)
 
-# ----------- Model averaging -----------
-
+# ----------- Prediction averaging -----------
 preds = (0.6 * preds_xgb) + (0.4 * preds_cat)
 
 ################
