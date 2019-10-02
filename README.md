@@ -6,7 +6,7 @@ __Task__: predict movie's overall box office revenue
 
 __Evaluation__: Root-Mean-Squared-Logarithmic-Error (RMSLE)
 
-__Solution__: prediction averaging over (1) XGBoost and (2) CatBoost
+__Solution__: prediction averaging over XGBoost and CatBoost
 
 __Success__: 2.03 RMSLE
 
